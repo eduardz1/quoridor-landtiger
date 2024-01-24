@@ -60,9 +60,7 @@ uint16_t
 #else
 struct Node **
 #endif
-reconstruct_path(const struct Node *start,
-                 struct Node *goal,
-                 uint8_t *path_length)
+reconstruct_path(struct Node *goal, uint8_t *path_length)
 {
 #ifdef ONLY_NEXT_MOVE
     union {
@@ -74,32 +72,32 @@ reconstruct_path(const struct Node *start,
         uint16_t as_uint16_t;
     } next_move;
 
-    *path_length = goal->g + 1;
+    *path_length = 1;
 
     struct Node *tmp = goal;
-    for (uint8_t i = goal->g; i > 1; i--)
+    while(tmp->parent != NULL)
     {
-        tmp = tmp->parent;
-    }
+        next_move.coordinates.x = tmp->x;
+        next_move.coordinates.y = tmp->y;
 
-    next_move.coordinates.x = tmp->x;
-    next_move.coordinates.y = tmp->y;
+        tmp = tmp->parent;
+        *path_length += 1;
+    }
 
     return next_move.as_uint16_t;
 #else
     struct Node **path = malloc(sizeof(struct Node *) * (goal->g + 1));
     if (path == NULL) return NULL;
 
-    *path_length = goal->g + 1;
+    *path_length = 1;
 
     struct Node *tmp = goal;
-    for (uint8_t i = goal->g; i > 0; i--)
+    while(tmp != NULL)
     {
         path[i] = node_new_dynamic(tmp->x, tmp->y, tmp->g, tmp->h);
         tmp = tmp->parent;
+        *path_length += 1;
     }
-
-    path[0] = node_new_dynamic(start->x, start->y, start->g, start->h);
 
     return path;
 #endif
@@ -161,6 +159,7 @@ astar(const uint8_t start_x,
       const uint8_t start_y,
       const uint8_t goal,
       const uint8_t starter_neighbors[MAX_NEIGHBORS][2],
+      const uint8_t starter_neighbors_weights[MAX_NEIGHBORS],
       const uint8_t starter_neighbors_length,
       uint8_t *path_length)
 {
@@ -186,13 +185,13 @@ astar(const uint8_t start_x,
         uint8_t data[4][2];
     } neighbors = {0};
 
-    uint8_t tent_g = 1;
     for (uint8_t i = 0; i < starter_neighbors_length; i++)
     { // use the starter neighbors as the initial set of cells to visit
         uint8_t x = starter_neighbors[i][0];
         uint8_t y = starter_neighbors[i][1];
 
-        struct Node *neighbor = node_new(x, y, tent_g, abs(y - goal));
+        struct Node *neighbor = node_new(
+            x, y, starter_neighbors_weights[i], abs(y - goal));
         neighbor->parent = start_l;
         min_heap_insert(open_set.heap, neighbor);
         open_set.hash[x][y] = true;
@@ -205,17 +204,17 @@ astar(const uint8_t start_x,
 
         if (curr->y == goal) // check if we reached the goal
         {
-            res = reconstruct_path(start_l, curr, path_length);
+            res = reconstruct_path(curr, path_length);
             break;
         }
 
         closed_set[curr->x][curr->y] = true;
         update_neighbors(neighbors.data, &neighbors.size, curr->x, curr->y);
 
-        tent_g = curr->g + 1; // distance curr -> neighbor is constant
-
         for (uint8_t i = 0; i < neighbors.size; i++)
         {
+            uint8_t tent_g = curr->g + 1; // distance curr -> neighbor is constant
+
             uint8_t x = neighbors.data[i][0];
             uint8_t y = neighbors.data[i][1];
 

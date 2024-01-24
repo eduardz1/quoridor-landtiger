@@ -26,9 +26,7 @@ uint16_t
 #else
 struct Node **
 #endif
-reconstruct_path(const struct Node *start,
-                 struct Node *goal,
-                 uint8_t *path_length);
+reconstruct_path(struct Node *goal, uint8_t *path_length);
 
 /**
  * @brief A* search over the board, checking only if the winning row is reached
@@ -55,5 +53,6 @@ astar(const uint8_t start_x,
       const uint8_t start_y,
       const uint8_t goal,
       const uint8_t starter_neighbors[MAX_NEIGHBORS][2],
+      const uint8_t starter_neighbors_weights[MAX_NEIGHBORS],
       const uint8_t starter_neighbors_length,
       uint8_t *path_length);

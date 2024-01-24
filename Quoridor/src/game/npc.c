@@ -24,9 +24,42 @@ extern enum Direction direction;
 // (i.e. for training a neural network)
 static const struct PlayerInfo *me;
 
+uint8_t get_weight(struct PlayerInfo player, const uint8_t x1, const uint8_t y1, const uint8_t x2, const uint8_t y2)
+{
+    uint8_t backup_x = player.x;
+    uint8_t backup_y = player.y;
+
+    board.board[player.x][player.y].player_id = NONE;
+    board.board[x1][y1].player_id = player.player_id;
+
+    calculate_possible_moves(player.player_id == RED ? WHITE : RED);
+
+    uint8_t best_y = current_possible_moves[0].y;
+    for(uint8_t i = 1; i < MAX_NEIGHBORS && current_possible_moves->as_uint32_t != UINT32_MAX; i++)
+    {
+        if(player.player_id == RED && current_possible_moves[i].y < best_y)
+        {
+            best_y = current_possible_moves[i].y;
+        }
+        else if(player.player_id == WHITE && current_possible_moves[i].y > best_y)
+        {
+            best_y = current_possible_moves[i].y;
+        }
+    }
+
+    board.board[player.x][player.y].player_id = player.player_id;
+    board.board[x1][y1].player_id = NONE;
+    calculate_possible_moves(player.player_id); // reset
+
+    // penalizes cases where a move enables the opponent to jump over,
+    // TODO: penalize also diagonal moves that make its path shorter
+    return 1 + (abs(best_y - y2) > 1 ? 1 : 0); 
+}
+
 struct Coordinate
 calculate_best_move(const struct PlayerInfo *player, uint8_t *path_length)
 {
+    struct PlayerInfo opponent = player->player_id == RED ? white : red;
     struct Coordinate best_move;
 
     calculate_possible_moves(player->player_id); // TODO: can be optimized
@@ -35,6 +68,7 @@ calculate_best_move(const struct PlayerInfo *player, uint8_t *path_length)
     {
         uint8_t size;
         uint8_t data[MAX_NEIGHBORS][2];
+        uint8_t weights[MAX_NEIGHBORS];
     } neighbors = {.size = 0};
     for (uint8_t i = 0; i < MAX_NEIGHBORS; i++)
     {
@@ -42,6 +76,7 @@ calculate_best_move(const struct PlayerInfo *player, uint8_t *path_length)
         {
             neighbors.data[neighbors.size][0] = current_possible_moves[i].x;
             neighbors.data[neighbors.size][1] = current_possible_moves[i].y;
+            neighbors.weights[neighbors.size] = get_weight(*player,current_possible_moves[i].x, current_possible_moves[i].y, opponent.x, opponent.y);
             neighbors.size++;
         }
     }
@@ -58,6 +93,7 @@ calculate_best_move(const struct PlayerInfo *player, uint8_t *path_length)
                                   player->y,
                                   player->player_id == RED ? BOARD_SIZE - 1 : 0,
                                   neighbors.data,
+                                  neighbors.weights,
                                   neighbors.size,
                                   path_length);
 
