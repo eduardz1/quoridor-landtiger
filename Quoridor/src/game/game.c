@@ -29,7 +29,7 @@
 static bool AI_enabled;
 enum Player opponent = WHITE;
 
-union Move current_possible_moves[5] = {0};
+struct Coordinate legal_moves[MAX_NEIGHBORS] = {UINT8_MAX};
 enum Player current_player = WHITE;
 struct Board board = {0};
 enum Mode mode = GAME_MODE_SELECTION;
@@ -82,6 +82,9 @@ void select_menu_option(bool up_or_down)
 
     case TWO_BOARDS_MENU:
         AI_enabled = up_or_down ? true : false;
+
+        // wait for handshake
+
         mode = COLOR_SELECTION_MENU;
         draw_color_selection_menu();
         break;
@@ -103,7 +106,7 @@ void change_turn(void)
     mode = PLAYER_MOVE; // reset to default
     clear_highlighted_moves();
     LCD_draw_rectangle(2, 9, 2 + 8 * 21, 9 + 8 + 4 + 8, TABLE_COLOR);
-    calculate_possible_moves(current_player);
+    calculate_possible_moves(legal_moves, current_player);
     highlight_possible_moves();
     refresh_info_panel(20);
 
@@ -114,23 +117,15 @@ void change_turn(void)
         enable_RIT();
         change_turn();
     }
-    else
-    {
-        enable_RIT();
-    }
+    else { enable_RIT(); }
 }
 
-void calculate_possible_moves(const enum Player player)
+void calculate_possible_moves(struct Coordinate moves[MAX_NEIGHBORS],
+                              const enum Player player)
 {
-    uint8_t i, x = player == RED ? red.x : white.x,
-               y = player == RED ? red.y : white.y;
-    union Move possible_moves[5] = {0}; // MAX number of possible moves
-
-    for (i = 0; i < ARRAY_SIZE(possible_moves); i++)
-    {
-        possible_moves[i].player_id = player;
-    }
-    i = 0;
+    uint8_t x = player == RED ? red.x : white.x,
+            y = player == RED ? red.y : white.y, i = 0;
+    struct Coordinate possible_moves[MAX_NEIGHBORS] = {0};
 
     // check left
     if (x > 0 && !board.board[x][y].walls.left)
@@ -256,10 +251,13 @@ void calculate_possible_moves(const enum Player player)
         }
     }
 
-    for (; i < ARRAY_SIZE(possible_moves); possible_moves[i++].as_uint32_t = -1)
-        ;
+    for (; i < ARRAY_SIZE(possible_moves); i++)
+    {
+        possible_moves[i].x = UINT8_MAX;
+        possible_moves[i].y = UINT8_MAX;
+    }
 
-    memcpy(current_possible_moves, possible_moves, sizeof(possible_moves));
+    memcpy(moves, possible_moves, sizeof(possible_moves));
 }
 
 union Move move_player(const uint8_t x, const uint8_t y)
@@ -269,9 +267,9 @@ union Move move_player(const uint8_t x, const uint8_t y)
     move.y = y;
     move.player_id = current_player;
 
-    for (uint8_t i = 0; i < ARRAY_SIZE(current_possible_moves); i++)
+    for (uint8_t i = 0; i < ARRAY_SIZE(legal_moves); i++)
     {
-        if (current_possible_moves[i].as_uint32_t != move.as_uint32_t) continue;
+        if (legal_moves[i].x != move.x && legal_moves[i].y != move.y) continue;
 
         board
             .board[current_player == RED ? red.x : white.x]
@@ -450,7 +448,7 @@ void rollback_walls(uint8_t x,
 union Move place_wall(const uint8_t x, const uint8_t y)
 {
     const enum Direction dir = direction; // cache const for performance
-    const struct PlayerInfo *player = current_player == RED ? &red : &white;
+    struct PlayerInfo *player = current_player == RED ? &red : &white;
     const struct Sprite *wall_sprite = dir == HORIZONTAL ? &wall_horizontal :
                                                            &wall_vertical;
     union Move move = {.x = x,
@@ -474,29 +472,12 @@ union Move place_wall(const uint8_t x, const uint8_t y)
         return move; // DO NOT MERGE THE PRECEDING LINE WITH THIS ONE
     }
 
-    if (current_player == RED)
-        red.wall_count--;
-    else
-        white.wall_count--;
+    player->wall_count--;
 
     backup_walls(
         move.x, move.y, walls_backup, neighbors, ARRAY_SIZE(neighbors));
 
-    switch (dir)
-    {
-    case HORIZONTAL:
-        board.board[move.x][move.y].walls.bottom = true;
-        board.board[move.x + 1][move.y].walls.bottom = true;
-        board.board[move.x][move.y + 1].walls.top = true;
-        board.board[move.x + 1][move.y + 1].walls.top = true;
-        break;
-    case VERTICAL:
-        board.board[move.x][move.y].walls.right = true;
-        board.board[move.x + 1][move.y].walls.left = true;
-        board.board[move.x][move.y + 1].walls.right = true;
-        board.board[move.x + 1][move.y + 1].walls.left = true;
-        break;
-    }
+    place_tmp_wall(dir, move.x, move.y);
 
     if (!is_wall_valid(move.x, move.y, dir))
     {

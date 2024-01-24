@@ -6,7 +6,6 @@
 #include "../common.h"
 #include "../game/game.h"
 #include "../game/graphics.h"
-#include "../imgs/sprites.h"
 #include "LPC17xx.h"
 #include "RIT.h"
 #include <stdint.h>
@@ -91,10 +90,7 @@ static void _handle_joystick_select(int8_t *joystick,
             union Move res = (mode == PLAYER_MOVE ? move_player : place_wall)(
                 (uint8_t)offset->x, (uint8_t)offset->y);
 
-            if (res.as_uint32_t == (uint32_t)-1)
-            {
-                write_invalid_move();
-            }
+            if (res.as_uint32_t == (uint32_t)-1) { write_invalid_move(); }
             else
             {
                 (void)handle_update_selector(0, 0, false);
@@ -103,10 +99,7 @@ static void _handle_joystick_select(int8_t *joystick,
             }
         }
     }
-    else if (!GPIO_DOWN(SELECT))
-    {
-        joystick[SELECT] = 0;
-    }
+    else if (!GPIO_DOWN(SELECT)) { joystick[SELECT] = 0; }
 }
 
 /**
@@ -128,10 +121,7 @@ _handle_joystick_movement(int8_t *joystick, struct Coordinate *offset)
             int8_t y = i == RIGHT ? 1 : i == LEFT ? -1 : 0;
             *offset = handle_update_selector(x, y, true);
         }
-        else if (!GPIO_DOWN(i))
-        {
-            joystick[i] = 0;
-        }
+        else if (!GPIO_DOWN(i)) { joystick[i] = 0; }
     }
 }
 

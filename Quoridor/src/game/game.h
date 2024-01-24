@@ -15,7 +15,7 @@
       // possible
 
 extern enum Player opponent;
-extern union Move current_possible_moves[MAX_NEIGHBORS];
+extern struct Coordinate legal_moves[MAX_NEIGHBORS];
 extern struct Board board;
 extern enum Player current_player;
 extern enum Direction direction;
@@ -33,7 +33,8 @@ void game_init(void);
  */
 void change_turn(void);
 
-void calculate_possible_moves(const enum Player player);
+void calculate_possible_moves(struct Coordinate moves[MAX_NEIGHBORS],
+                              const enum Player player);
 
 /**
  * @brief moves the player sprite, updates the current player position on the

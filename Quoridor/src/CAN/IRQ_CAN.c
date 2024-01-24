@@ -19,8 +19,9 @@
  *----------------------------------------------------------------------------*/
 
 #include "../GLCD/GLCD.h"
-#include "CAN.h"     /* LPC17xx CAN adaption layer */
-#include <LPC17xx.h> /* LPC17xx definitions */
+#include "../common.h"
+#include "CAN.h"
+#include <LPC17xx.h>
 
 extern uint8_t icr; // icr and result must be global in order to work with both
                     // real and simulated landtiger.
@@ -28,14 +29,9 @@ extern uint32_t result;
 extern CAN_msg CAN_TxMsg; /* CAN message for sending */
 extern CAN_msg CAN_RxMsg; /* CAN message for receiving */
 
-// static int puntiRicevuti1 = 0;
-// static int puntiInviati1 = 0;
+union Move fetched_move;
 
-// static int puntiRicevuti2 = 0;
-// static int puntiInviati2 = 0;
-
-// uint16_t val_RxCoordX = 0; /* Locals used for display */
-// uint16_t val_RxCoordY = 0;
+bool handshake_successful = false;
 
 /*----------------------------------------------------------------------------
   CAN interrupt handler
@@ -43,63 +39,25 @@ extern CAN_msg CAN_RxMsg; /* CAN message for receiving */
 void CAN_IRQHandler(void)
 {
 
-    //   /* check CAN controller 1 */
-    // 	icr = 0;
-    //   icr = (LPC_CAN1->ICR | icr) & 0xFF;               /* clear interrupts
-    //   */
+    /* check CAN controller 1 */
+    icr = 0;
+    icr = (LPC_CAN1->ICR | icr) & 0xFF; /* clear interrupts */
 
-    //   if (icr & (1 << 0)) {                          		/* CAN
-    //   Controller #1 meassage is received */
-    // 		CAN_rdMsg (1, &CAN_RxMsg);	                		/* Read the
-    // message */
-    //     LPC_CAN1->CMR = (1 << 2);                    		/* Release
-    //     receive buffer */
+    if (icr & (1 << 0))
+    {                             /* CAN Controller #1 meassage is received */
+        CAN_rdMsg(1, &CAN_RxMsg); /* Read the message */
+        LPC_CAN1->CMR = (1 << 2); /* Release receive buffer */
 
-    // 		val_RxCoordX = (CAN_RxMsg.data[0] << 8)  ;
-    // 		val_RxCoordX = val_RxCoordX | CAN_RxMsg.data[1];
+        fetched_move.as_uint32_t = CAN_RxMsg.data[0] << 24 |
+                                   CAN_RxMsg.data[1] << 16 |
+                                   CAN_RxMsg.data[2] << 8 | CAN_RxMsg.data[3];
 
-    // 		val_RxCoordY = (CAN_RxMsg.data[2] << 8);
-    // 		val_RxCoordY = val_RxCoordY | CAN_RxMsg.data[3];
+        if (!handshake_successful && fetched_move.player_id == 0xFF)
+        {
+            handshake_successful = true;
+            return;
+        }
 
-    // 		display.x = val_RxCoordX;
-    // 		display.y = val_RxCoordY-140;
-    // 		//TP_DrawPoint_Magnifier(&display);
-
-    // 		puntiRicevuti1++;
-    //   }
-    // 	else
-    // 		if (icr & (1 << 1)) {                         /* CAN Controller #1
-    // meassage is transmitted */
-    // 			// do nothing in this example
-    // 			puntiInviati1++;
-    // 		}
-
-    // 	/* check CAN controller 2 */
-    // 	icr = 0;
-    // 	icr = (LPC_CAN2->ICR | icr) & 0xFF;             /* clear interrupts */
-
-    // 	if (icr & (1 << 0)) {                          	/* CAN Controller #2
-    // meassage is received */ 		CAN_rdMsg (2, &CAN_RxMsg);
-    // /* Read the message */
-    //     LPC_CAN2->CMR = (1 << 2);                    		/* Release
-    //     receive buffer */
-
-    // 		val_RxCoordX = (CAN_RxMsg.data[0] << 8)  ;
-    // 		val_RxCoordX = val_RxCoordX | CAN_RxMsg.data[1];
-
-    // 		val_RxCoordY = (CAN_RxMsg.data[2] << 8);
-    // 		val_RxCoordY = val_RxCoordY | CAN_RxMsg.data[3];
-
-    // 		display.x = val_RxCoordX;
-    // 		display.y = val_RxCoordY+140;
-    // 		TP_DrawPoint_Magnifier(&display);
-
-    // 		puntiRicevuti2++;
-    // 	}
-    // 	else
-    // 		if (icr & (1 << 1)) {                         /* CAN Controller #2
-    // meassage is transmitted */
-    // 			// do nothing in this example
-    // 			puntiInviati2++;
-    // 		}
+        // move(fetched_move); // TODO: implement
+    }
 }
