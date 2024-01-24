@@ -1,6 +1,6 @@
 #include "headers/sort.h"
-
 #include <assert.h>
+#include <string.h>
 
 __attribute__((flatten)) void
 sort(void *const array, const size_t size, const int length, const Comp comp)

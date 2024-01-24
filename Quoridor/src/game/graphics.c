@@ -312,7 +312,9 @@ update_player_selector(const int8_t up, const int8_t right, bool show)
 
     color->draw(start_x, start_y);
 
-    if (!show) return (struct Coordinate){(uint16_t)x, (uint16_t)y}; // clear selector only
+    if (!show)
+        return (struct Coordinate){(uint8_t)x, (uint8_t)y}; // clear selector
+                                                            // only
 
     x += right;
     y += up;
@@ -325,7 +327,7 @@ update_player_selector(const int8_t up, const int8_t right, bool show)
 
     player_selector.draw(start_x, start_y);
 
-    return (struct Coordinate){(uint16_t)x, (uint16_t)y};
+    return (struct Coordinate){(uint8_t)x, (uint8_t)y};
 }
 
 struct Coordinate
@@ -356,7 +358,9 @@ update_wall_selector(const int8_t up, const int8_t right, bool show)
                      // selector but it's more complicated, on board it's speedy
                      // enough, low priority
 
-    if (!show) return (struct Coordinate){(uint16_t)x, (uint16_t)y}; // clear selector only
+    if (!show)
+        return (struct Coordinate){(uint8_t)x, (uint8_t)y}; // clear selector
+                                                            // only
 
     x += right;
     y += up;
@@ -378,13 +382,13 @@ update_wall_selector(const int8_t up, const int8_t right, bool show)
         wall_vertical_selector.draw(start_x, start_y);
     }
 
-    return (struct Coordinate){(uint16_t)x, (uint16_t)y};
+    return (struct Coordinate){(uint8_t)x, (uint8_t)y};
 }
 
 struct Coordinate
 update_menu_selector(const int8_t up, const int8_t right, bool show)
 {
-    static int8_t last_y = 0;     
+    static int8_t last_y = 0;
     (void)right;
 
     highlighted_square_wide_wide_table_color.draw(
@@ -392,7 +396,7 @@ update_menu_selector(const int8_t up, const int8_t right, bool show)
         last_y == 0 ? 40 + 40 + 2 + 16 + 40 + 2 :
                       40 + 40 + 2 + 16 + 40 + 32 + 2 + 2);
 
-    if (!show) return (struct Coordinate){0, (uint16_t)last_y};
+    if (!show) return (struct Coordinate){0, (uint8_t)last_y};
 
     last_y += up;
 
@@ -403,5 +407,5 @@ update_menu_selector(const int8_t up, const int8_t right, bool show)
         last_y == 0 ? 40 + 40 + 2 + 16 + 40 + 2 :
                       40 + 40 + 2 + 16 + 40 + 32 + 2 + 2);
 
-    return (struct Coordinate){0, (uint16_t)last_y};
+    return (struct Coordinate){0, (uint8_t)last_y};
 }

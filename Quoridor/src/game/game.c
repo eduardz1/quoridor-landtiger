@@ -325,7 +325,6 @@ bool is_wall_between(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
 bool find_path(uint8_t x, uint8_t y, const uint8_t winning_y)
 {
     struct Stack stack;
-    struct Coordinate coordinate;
     bool visited[BOARD_SIZE][BOARD_SIZE] = {false};
 
     stack_init(&stack, BOARD_SIZE * BOARD_SIZE);
@@ -334,18 +333,14 @@ bool find_path(uint8_t x, uint8_t y, const uint8_t winning_y)
 
     while (!is_empty(&stack))
     {
-        coordinate = pop(&stack);
-        x = (uint8_t)coordinate.x;
-        y = (uint8_t)coordinate.y;
+        struct Coordinate coordinate = pop(&stack);
+        x = coordinate.x;
+        y = coordinate.y;
 
-        if (y == winning_y)
-        {
-            free_stack(&stack);
-            return true;
-        }
+        if (y == winning_y) return true;
 
         // neighbors to visit
-        struct Coordinate neighbors[] = {
+        uint8_t neighbors[][2] = {
             {    x, y - 1},
             {    x, y + 1},
             {x + 1,     y},
@@ -354,8 +349,8 @@ bool find_path(uint8_t x, uint8_t y, const uint8_t winning_y)
 
         for (uint8_t i = 0; i < ARRAY_SIZE(neighbors); i++)
         {
-            uint8_t new_x = (uint8_t)neighbors[i].x;
-            uint8_t new_y = (uint8_t)neighbors[i].y;
+            uint8_t new_x = neighbors[i][0];
+            uint8_t new_y = neighbors[i][1];
 
             if (new_x < BOARD_SIZE && new_y < BOARD_SIZE &&
                 !visited[new_x][new_y] && !is_wall_between(x, y, new_x, new_y))
@@ -366,7 +361,6 @@ bool find_path(uint8_t x, uint8_t y, const uint8_t winning_y)
         }
     }
 
-    free_stack(&stack);
     return false;
 }
 

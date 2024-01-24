@@ -52,8 +52,8 @@ struct PlayerInfo
 
 struct Coordinate
 {
-    uint16_t x;
-    uint16_t y;
+    uint8_t x;
+    uint8_t y;
 };
 
 enum Mode

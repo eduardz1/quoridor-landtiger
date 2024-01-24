@@ -164,10 +164,10 @@ astar(const uint8_t start_x,
       const uint8_t starter_neighbors_length,
       uint8_t *path_length)
 {
+    node_pool_size = 0;
+
     struct Node *start_l = node_new(start_x, start_y, 0, 0);
-#ifdef ONLY_NEXT_MOVE
-    uint16_t res;
-#else
+#ifndef ONLY_NEXT_MOVE
     struct Node **res;
 #endif
 
@@ -176,10 +176,11 @@ astar(const uint8_t start_x,
 
     struct
     {
-        struct MinHeap *heap;              // priority queue on f-score
+        struct MinHeap heap;               // priority queue on f-score
         bool hash[BOARD_SIZE][BOARD_SIZE]; // keeps track of nodes in the heap
-    } open_set = {.heap = new_min_heap(BOARD_SIZE * BOARD_SIZE, compare_nodes),
-                  .hash = {false}};
+    } open_set = {.hash = {false}};
+    new_min_heap(&open_set.heap, compare_nodes);
+
     struct
     {
         uint8_t size;
@@ -194,20 +195,17 @@ astar(const uint8_t start_x,
 
         struct Node *neighbor = node_new(x, y, tent_g, abs(y - goal));
         neighbor->parent = start_l;
-        min_heap_insert(open_set.heap, neighbor);
+        min_heap_insert(&open_set.heap, neighbor);
         open_set.hash[x][y] = true;
     }
 
-    while (open_set.heap->size > 0)
+    while (open_set.heap.size > 0)
     {
-        struct Node *curr = min_heap_extract(open_set.heap);
+        struct Node *curr = min_heap_extract(&open_set.heap);
         open_set.hash[curr->x][curr->y] = false;
 
-        if (curr->y == goal) // check if we reached the goal
-        {
-            res = reconstruct_path(start_l, curr, path_length);
-            break;
-        }
+        if (curr->y == goal)
+            return reconstruct_path(start_l, curr, path_length);
 
         closed_set[curr->x][curr->y] = true;
         update_neighbors(neighbors.data, &neighbors.size, curr->x, curr->y);
@@ -223,27 +221,25 @@ astar(const uint8_t start_x,
 
             if (open_set.hash[x][y]) // already in the open set
             {
-                uint8_t j = find_in_open_set(open_set.heap, x, y);
-                struct Node *neighbor = open_set.heap->data[j];
+                uint8_t j = find_in_open_set(&open_set.heap, x, y);
+                struct Node *neighbor = open_set.heap.data[j];
                 if (tent_g < neighbor->g)
                 { // shorter path found
                     neighbor->g = tent_g;
                     neighbor->f = tent_g + neighbor->h;
                     neighbor->parent = curr;
-                    bottom_heapify(open_set.heap, j); // we know that old_f > f
+                    bottom_heapify(&open_set.heap, j); // we know that old_f > f
                 }
             }
             else
             { // new node
                 struct Node *neighbor = node_new(x, y, tent_g, abs(y - goal));
                 neighbor->parent = curr;
-                min_heap_insert(open_set.heap, neighbor);
+                min_heap_insert(&open_set.heap, neighbor);
                 open_set.hash[x][y] = true;
             }
         }
     }
 
-    min_heap_free(open_set.heap);
-    node_pool_size = 0;
-    return res;
+    return 0;
 }

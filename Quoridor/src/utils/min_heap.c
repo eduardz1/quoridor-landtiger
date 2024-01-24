@@ -33,37 +33,15 @@ void bottom_heapify(struct MinHeap *heap, uint8_t i)
     }
 }
 
-struct MinHeap *new_min_heap(const uint8_t capacity, const Comp comp)
+void new_min_heap(struct MinHeap *heap, const Comp comp)
 {
-    struct MinHeap *heap = malloc(sizeof(struct MinHeap));
-    if (heap == NULL) exit(1); // out of memory
-
-    heap->capacity = capacity;
     heap->size = 0;
     heap->comp = comp;
-
-    heap->data = malloc(capacity * sizeof(void *));
-    if (heap->data == NULL) exit(1); // out of memory
-
-    return heap;
-}
-
-void min_heap_free(struct MinHeap *heap)
-{
-    if (heap == NULL) return;
-
-    free(heap->data);
-    free(heap);
 }
 
 void min_heap_insert(struct MinHeap *heap, void *value)
 {
-    if (heap->size == heap->capacity)
-    {
-        heap->capacity *= 2;
-        heap->data = realloc(heap->data, heap->capacity * sizeof(void *));
-        if (heap->data == NULL) exit(1); // out of memory
-    }
+    if (heap->size == MIN_HEAP_SIZE) return; // heap full
 
     heap->data[heap->size] = value;
     bottom_heapify(heap, heap->size);
