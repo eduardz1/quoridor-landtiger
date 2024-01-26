@@ -7,7 +7,6 @@
 #include "GLCD/GLCD.h"
 #include "LPC17xx.h"
 #include "RIT/RIT.h"
-#include "button_EXINT/button.h"
 #include "common.h"
 #include "game/game.h"
 #include "joystick/joystick.h"
@@ -23,10 +22,8 @@ extern uint8_t ScaleFlag; // <- ScaleFlag needs to visible in order for the
 int main(void)
 {
     SystemInit(); /* System Initialization (i.e., PLL)  */
-    srand(7);     // FIXME: everything breaks if I do this
     LCD_Initialization();
     CAN_Init();
-    BUTTON_init();
     joystick_init();
 
     init_RIT(RIT_TIME); /* Poll joystick every 50ms */
@@ -36,5 +33,5 @@ int main(void)
     LPC_SC->PCON |= 0x1; /* power-down	mode */
     LPC_SC->PCON &= ~(0x2);
 
-    while (true) __ASM("wfi");
+    while (true) __asm("wfi");
 }

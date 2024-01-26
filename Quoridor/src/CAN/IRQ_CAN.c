@@ -1,3 +1,4 @@
+#include <stdint.h>
 #if defined(__ARMCC_VERSION) && (__ARMCC_VERSION >= 6000000)
 // no previous prototype for function 'CAN_IRQHandler'
 #pragma clang diagnostic ignored "-Wmissing-prototypes"
@@ -20,8 +21,11 @@
 
 #include "../GLCD/GLCD.h"
 #include "../common.h"
+#include "../game/game.h"
+#include "../game/graphics.h"
 #include "CAN.h"
 #include <LPC17xx.h>
+#include <stdlib.h>
 
 extern uint8_t icr; // icr and result must be global in order to work with both
                     // real and simulated landtiger.
@@ -30,8 +34,6 @@ extern CAN_msg CAN_TxMsg; /* CAN message for sending */
 extern CAN_msg CAN_RxMsg; /* CAN message for receiving */
 
 union Move fetched_move;
-
-bool handshake_successful = false;
 
 /*----------------------------------------------------------------------------
   CAN interrupt handler
@@ -48,16 +50,53 @@ void CAN_IRQHandler(void)
         CAN_rdMsg(1, &CAN_RxMsg); /* Read the message */
         LPC_CAN1->CMR = (1 << 2); /* Release receive buffer */
 
-        fetched_move.as_uint32_t = CAN_RxMsg.data[0] << 24 |
-                                   CAN_RxMsg.data[1] << 16 |
-                                   CAN_RxMsg.data[2] << 8 | CAN_RxMsg.data[3];
+        fetched_move.bytes[0] = CAN_RxMsg.data[0];
+        fetched_move.bytes[1] = CAN_RxMsg.data[1];
+        fetched_move.bytes[2] = CAN_RxMsg.data[2];
+        fetched_move.bytes[3] = CAN_RxMsg.data[3];
 
-        if (!handshake_successful && fetched_move.player_id == 0xFF)
+        if (!connected && fetched_move.player_id == 0xFF)
         {
-            handshake_successful = true;
-            return;
+            connected = true;
+            draw_color_selection_menu();
+
+            CAN_wrMsg(1, &CAN_RxMsg);
+            return; // handshake successful
         }
 
-        // move(fetched_move); // TODO: implement
+        if (connected)
+        {
+            if (fetched_move.player_id == 0xFC)
+            {
+                opponent = RED;
+                if (AI_enabled) NPC = WHITE;
+                draw_board();
+                srand(LPC_RIT->RICOUNTER);
+                change_turn();
+            }
+            else if (fetched_move.player_id == 0xFA)
+            {
+                opponent = WHITE;
+                if (AI_enabled) NPC = RED;
+                draw_board();
+                srand(LPC_RIT->RICOUNTER);
+                change_turn();
+            }
+        }
+
+        if (current_player == opponent)
+        {
+            if (fetched_move.type == PLAYER_MOVE)
+            {
+                move_player(fetched_move.x, fetched_move.y);
+                change_turn();
+            }
+            else if (fetched_move.type == WALL_PLACEMENT)
+            {
+                place_wall(
+                    fetched_move.x, fetched_move.y, fetched_move.direction);
+                change_turn();
+            }
+        }
     }
 }

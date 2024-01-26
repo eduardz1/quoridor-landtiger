@@ -13,8 +13,10 @@
 #endif
 
 #include "game.h"
+#include "../CAN/CAN.h"
 #include "../GLCD/GLCD.h"
 #include "../RIT/RIT.h"
+#include "../button_EXINT/button.h"
 #include "../imgs/sprites.h"
 #include "../utils/headers/dyn_array.h"
 #include "../utils/headers/stack.h"
@@ -26,8 +28,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-static bool AI_enabled;
+bool AI_enabled = false;
+bool CAN_enabled = false;
+
+bool connected = true;
+
 enum Player opponent = WHITE;
+enum Player NPC = WHITE; // TODO: make order of all this global when you can
+                         // test on the board again
 
 struct Coordinate legal_moves[MAX_NEIGHBORS] = {UINT8_MAX};
 enum Player current_player = WHITE;
@@ -61,6 +69,7 @@ void select_menu_option(bool up_or_down)
         else
         {
             mode = TWO_BOARDS_MENU;
+            CAN_enabled = true;
             draw_two_board_menu();
         }
         break;
@@ -74,24 +83,62 @@ void select_menu_option(bool up_or_down)
         }
         else
         {
-            AI_enabled = false;
             draw_board();
+            srand(LPC_RIT->RICOUNTER);
             change_turn();
         }
         break;
 
     case TWO_BOARDS_MENU:
-        AI_enabled = up_or_down ? true : false;
+        if (up_or_down) AI_enabled = true;
 
-        // wait for handshake
+        CAN_RxMsg.data[0] = 0xFF;
+        CAN_RxMsg.data[1] = 0xFF;
+        CAN_RxMsg.data[2] = 0xFF;
+        CAN_RxMsg.data[3] = 0xFF;
+        CAN_RxMsg.len = 4;
+        CAN_RxMsg.id = 1;
+        CAN_RxMsg.format = STANDARD_FORMAT;
+        CAN_RxMsg.type = DATA_FRAME;
+        CAN_wrMsg(1, &CAN_RxMsg);
+
+        draw_waiting_for_connection();
+        connected = false;
 
         mode = COLOR_SELECTION_MENU;
-        draw_color_selection_menu();
         break;
 
     case COLOR_SELECTION_MENU:
+
         opponent = up_or_down ? RED : WHITE;
+        NPC = opponent;
+
+        if (CAN_enabled)
+        {
+            NPC = opponent == RED ? WHITE : RED;
+            if (opponent == RED)
+            {
+                CAN_RxMsg.data[0] = 0xFA;
+                CAN_RxMsg.data[1] = 0xFA;
+                CAN_RxMsg.data[2] = 0xFA;
+                CAN_RxMsg.data[3] = 0xFA;
+            }
+            else
+            {
+                CAN_RxMsg.data[0] = 0xFC;
+                CAN_RxMsg.data[1] = 0xFC;
+                CAN_RxMsg.data[2] = 0xFC;
+                CAN_RxMsg.data[3] = 0xFC;
+            }
+
+            CAN_RxMsg.len = 4;
+            CAN_RxMsg.id = 1;
+            CAN_RxMsg.format = STANDARD_FORMAT;
+            CAN_RxMsg.type = DATA_FRAME;
+            CAN_wrMsg(1, &CAN_RxMsg);
+        }
         draw_board();
+        srand(LPC_RIT->RICOUNTER);
         change_turn();
         break;
 
@@ -108,16 +155,26 @@ void change_turn(void)
     LCD_draw_rectangle(2, 9, 2 + 8 * 21, 9 + 8 + 4 + 8, TABLE_COLOR);
     calculate_possible_moves(legal_moves, current_player);
     highlight_possible_moves();
-    refresh_info_panel(20);
+    reset_timer();
 
-    if (current_player == opponent && AI_enabled) // TODO: add CAN
+    if (current_player == opponent)
     {
-        disable_RIT();
+        if (AI_enabled && !CAN_enabled)
+        {
+            AI_move();
+            change_turn();
+        }
+        else if (!AI_enabled && CAN_enabled)
+        {
+            // wait for CAN message
+            return;
+        }
+    }
+    else if (CAN_enabled && AI_enabled)
+    {
         AI_move();
-        enable_RIT();
         change_turn();
     }
-    else { enable_RIT(); }
 }
 
 void calculate_possible_moves(struct Coordinate moves[MAX_NEIGHBORS],
@@ -269,7 +326,7 @@ union Move move_player(const uint8_t x, const uint8_t y)
 
     for (uint8_t i = 0; i < ARRAY_SIZE(legal_moves); i++)
     {
-        if (legal_moves[i].x != move.x && legal_moves[i].y != move.y) continue;
+        if (legal_moves[i].x != move.x || legal_moves[i].y != move.y) continue;
 
         board
             .board[current_player == RED ? red.x : white.x]
@@ -292,6 +349,18 @@ union Move move_player(const uint8_t x, const uint8_t y)
         }
 
         dyn_array_push(board.moves, move.as_uint32_t);
+        if (CAN_enabled && current_player != opponent)
+        {
+            CAN_TxMsg.data[0] = move.bytes[0];
+            CAN_TxMsg.data[1] = move.bytes[1];
+            CAN_TxMsg.data[2] = move.bytes[2];
+            CAN_TxMsg.data[3] = move.bytes[3];
+            CAN_TxMsg.len = 4;
+            CAN_TxMsg.id = 1;
+            CAN_TxMsg.format = STANDARD_FORMAT;
+            CAN_TxMsg.type = DATA_FRAME;
+            CAN_wrMsg(1, &CAN_TxMsg);
+        }
 
         if (red.y == BOARD_SIZE - 1)
         {
@@ -445,9 +514,9 @@ void rollback_walls(uint8_t x,
     }
 }
 
-union Move place_wall(const uint8_t x, const uint8_t y)
+union Move
+place_wall(const uint8_t x, const uint8_t y, const enum Direction dir)
 {
-    const enum Direction dir = direction; // cache const for performance
     struct PlayerInfo *player = current_player == RED ? &red : &white;
     const struct Sprite *wall_sprite = dir == HORIZONTAL ? &wall_horizontal :
                                                            &wall_vertical;
@@ -494,6 +563,18 @@ union Move place_wall(const uint8_t x, const uint8_t y)
                           (dir == HORIZONTAL ? empty_square.height : 0));
 
     dyn_array_push(board.moves, move.as_uint32_t);
+    if (CAN_enabled && current_player != opponent)
+    {
+        CAN_TxMsg.data[0] = move.bytes[0];
+        CAN_TxMsg.data[1] = move.bytes[1];
+        CAN_TxMsg.data[2] = move.bytes[2];
+        CAN_TxMsg.data[3] = move.bytes[3];
+        CAN_TxMsg.len = 4;
+        CAN_TxMsg.id = 1;
+        CAN_TxMsg.format = STANDARD_FORMAT;
+        CAN_TxMsg.type = DATA_FRAME;
+        CAN_wrMsg(1, &CAN_TxMsg);
+    }
     return move;
 }
 

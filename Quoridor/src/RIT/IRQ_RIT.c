@@ -19,12 +19,16 @@ enum Joystick
     UP = 4
 };
 
+uint32_t counter;
+
 #define GPIO_DOWN(n) ((LPC_GPIO1->FIOPIN & (1 << (25 + n))) == 0)
 #define BUTTON_DOWN(n)                                                         \
     ((LPC_PINCON->PINSEL4 & (1 << (20 + n * 2))) == 0 &&                       \
      (LPC_GPIO2->FIOPIN & (1 << (10 + n))) == 0)
 
-#define TURN_INTERVAL 20 // 20 seconds per turn
+#define TURN_INTERVAL                                                          \
+    21 // 20 + 1 seconds per turn, +1 so that it shows 20 at the start and still
+       // ends with 0, better UX
 #ifdef SIMULATOR
 #define RIT_SCALING_FACTOR                                                     \
     20 // simulator ~ 20 times slower than board on my machine
@@ -41,17 +45,17 @@ handle_update_selector(const int8_t up, const int8_t right, bool show)
                                      update_menu_selector)(up, right, show);
 }
 
-void handle_info_panel(uint32_t *counter)
+void handle_info_panel()
 {
     if (mode != PLAYER_MOVE && mode != WALL_PLACEMENT)
         return; // game not started yet
 
     // refresh every second
-    if ((*counter)-- % (TURN_INTERVAL / RIT_SCALING_FACTOR) == 0)
-        refresh_info_panel((uint8_t)*counter /
-                           (TURN_INTERVAL / RIT_SCALING_FACTOR));
+    if ((counter)-- % (TURN_INTERVAL / RIT_SCALING_FACTOR) == 0)
+        refresh_info_panel(
+            (uint8_t)(counter / (TURN_INTERVAL / RIT_SCALING_FACTOR)));
 
-    if (*counter != 0) return;
+    if (counter != 0) return;
 
     (void)dyn_array_push(board.moves,
                          (union Move){.direction = HORIZONTAL,
@@ -62,8 +66,7 @@ void handle_info_panel(uint32_t *counter)
                              .as_uint32_t);
 
     (void)handle_update_selector(0, 0, false);
-    change_turn();
-    *counter = COUNTER_VAL; // reset
+    //  change_turn();
 }
 
 /**
@@ -87,8 +90,11 @@ static void _handle_joystick_select(int8_t *joystick,
         }
         else
         {
-            union Move res = (mode == PLAYER_MOVE ? move_player : place_wall)(
-                (uint8_t)offset->x, (uint8_t)offset->y);
+            union Move res =
+                mode == PLAYER_MOVE ?
+                    move_player((uint8_t)offset->x, (uint8_t)offset->y) :
+                    place_wall(
+                        (uint8_t)offset->x, (uint8_t)offset->y, direction);
 
             if (res.as_uint32_t == (uint32_t)-1) { write_invalid_move(); }
             else
@@ -165,6 +171,8 @@ void handle_buttons(struct Coordinate *offset)
         LPC_PINCON->PINSEL4 |= (1 << 22); // External interrupt 0 pin selection
     }
 
+    if (mode != WALL_PLACEMENT) return;
+
     if (BUTTON_DOWN(2) && ++button_2 == 1)
     {
         direction = direction == VERTICAL ? HORIZONTAL : VERTICAL;
@@ -178,17 +186,34 @@ void handle_buttons(struct Coordinate *offset)
     }
 }
 
+void reset_timer()
+{
+    counter = COUNTER_VAL + 1;
+}
+
 void RIT_IRQHandler(void)
 {
-    static struct Coordinate offset;       // saves offset of current move
-    static uint32_t counter = COUNTER_VAL; // used as timer
+    static struct Coordinate offset; // saves offset of current move
 
-    handle_info_panel(&counter);
+    while (!connected) return;
+
+    if (mode == PLAYER_MOVE || mode == WALL_PLACEMENT)
+    {
+        handle_info_panel();
+
+        if ((AI_enabled && current_player == opponent) ||
+            (CAN_enabled && current_player == opponent) ||
+            (CAN_enabled && AI_enabled))
+        {                           // TODO: simplify the conditionals
+            LPC_RIT->RICTRL |= 0x1; /* clear interrupt flag */
+            return;
+        }
+
+        handle_buttons(&offset);
+    }
 
     handle_joystick(&counter, &offset);
 
-    handle_buttons(&offset);
-
-    reset_RIT();            // TODO: verify if it helps avoid overflow
+    // reset_RIT();            // TODO: verify if it helps avoid overflow
     LPC_RIT->RICTRL |= 0x1; /* clear interrupt flag */
 }

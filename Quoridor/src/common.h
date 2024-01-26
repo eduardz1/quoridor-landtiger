@@ -20,7 +20,7 @@
 #define RIT_MS 50
 #define RIT_TIME 0x004C4B40 // 50ms polling
 
-#define SIMULATOR 1
+// #define SIMULATOR 1
 
 #define BOARD_SIZE 7
 #define BOARD_TIMER 20 // timer in seconds
@@ -44,7 +44,7 @@ enum Player
 
 struct PlayerInfo
 {
-    enum Player player_id;
+    enum Player id;
     uint8_t x;
     uint8_t y;
     uint8_t wall_count;
@@ -110,5 +110,6 @@ union Move { // 32 bit integer representing a move
         enum Player player_id    : 8;
     };
 
+    uint8_t bytes[4];
     uint32_t as_uint32_t;
 };

@@ -69,6 +69,12 @@ void draw_two_board_menu(void)
                    1);
 }
 
+void draw_waiting_for_connection(void)
+{
+    LCD_draw_full_width_rectangle(40, 40 + 2 + 16 + 16, TABLE_COLOR);
+    LCD_write_text(16, 40, "Waiting for connection...", Black, TRANSPARENT, 1);
+}
+
 void draw_color_selection_menu(void)
 {
     LCD_draw_full_width_rectangle(40, 40 + 2 + 16 + 16, TABLE_COLOR);
