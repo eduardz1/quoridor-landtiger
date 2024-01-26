@@ -163,7 +163,7 @@ struct _Tuple choose_defensive_wall(const uint8_t path)
     struct _Tuple tu = choose_wall(opponent.id);
     last_path_length = tu.path;
 
-    // CHOOSE A WALL THAT MAKES THE MAIN CHARACTER's PATH LONGER
+    // CHOOSE A WALL THAT DEFENDS THE NPC
     for (uint8_t i = 0; i < (BOARD_SIZE - 1) * (BOARD_SIZE - 1); i++)
     {
         // initializing coordinate like this ensures we are iterating over all

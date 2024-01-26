@@ -66,7 +66,7 @@ void handle_info_panel()
                              .as_uint32_t);
 
     (void)handle_update_selector(0, 0, false);
-    //  change_turn();
+    change_turn();
 }
 
 /**
