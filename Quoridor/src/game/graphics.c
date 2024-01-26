@@ -69,6 +69,12 @@ void draw_two_board_menu(void)
                    1);
 }
 
+void draw_waiting_for_connection(void)
+{
+    LCD_draw_full_width_rectangle(40, 40 + 2 + 16 + 16, TABLE_COLOR);
+    LCD_write_text(16, 40, "Waiting for connection...", Black, TRANSPARENT, 1);
+}
+
 void draw_color_selection_menu(void)
 {
     LCD_draw_full_width_rectangle(40, 40 + 2 + 16 + 16, TABLE_COLOR);
@@ -213,18 +219,12 @@ void highlight_possible_moves(void)
 
     for (i = 0; i < 5; i++)
     {
-        if (current_possible_moves[i].as_uint32_t == (uint32_t)-1) continue;
+        if (legal_moves[i].x == UINT8_MAX) continue;
 
-        start_x =
-            board
-                .board[current_possible_moves[i].x][current_possible_moves[i].y]
-                .x +
-            HIGHLIGHT_PADDING;
-        start_y =
-            board
-                .board[current_possible_moves[i].x][current_possible_moves[i].y]
-                .y +
-            HIGHLIGHT_PADDING;
+        start_x = board.board[legal_moves[i].x][legal_moves[i].y].x +
+                  HIGHLIGHT_PADDING;
+        start_y = board.board[legal_moves[i].x][legal_moves[i].y].y +
+                  HIGHLIGHT_PADDING;
 
         highlighted_square.draw(start_x, start_y);
     }
@@ -239,10 +239,10 @@ void clear_highlighted_moves(void)
 
     for (i = 0; i < 5; i++)
     {
-        if (current_possible_moves[i].as_uint32_t == (uint32_t)-1) break;
+        if (legal_moves[i].x == UINT8_MAX) break;
 
-        x = current_possible_moves[i].x;
-        y = current_possible_moves[i].y;
+        x = legal_moves[i].x;
+        y = legal_moves[i].y;
 
         start_x = board.board[x][y].x + HIGHLIGHT_PADDING;
         start_y = board.board[x][y].y + HIGHLIGHT_PADDING;

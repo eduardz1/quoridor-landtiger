@@ -37,12 +37,12 @@ extern void RIT_IRQHandler(void);
 struct Coordinate
 handle_update_selector(const int8_t up, const int8_t right, bool show);
 
+void reset_timer();
+
 /**
  * @brief refreshes the info panel in the top right corner
- *
- * @param counter counter used to keep track of the time
  */
-void handle_info_panel(uint32_t *counter);
+void handle_info_panel();
 
 /**
  * @brief handles of of the 5 joystick operations

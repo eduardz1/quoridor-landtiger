@@ -12,57 +12,51 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-extern enum Player opponent; // I AM THE OPPONENT!
-extern union Move current_possible_moves[MAX_NEIGHBORS];
-
-extern struct PlayerInfo red;
-extern struct PlayerInfo white;
-
-extern enum Direction direction;
-
 // cached for performance, modify if AI vs AI mode is needed
 // (i.e. for training a neural network)
 static const struct PlayerInfo *me;
 
-uint8_t get_weight(struct PlayerInfo player, const uint8_t x1, const uint8_t y1, const uint8_t x2, const uint8_t y2)
+uint8_t get_weight(struct PlayerInfo player,
+                   const uint8_t x1,
+                   const uint8_t y1,
+                   const uint8_t x2,
+                   const uint8_t y2)
 {
-    uint8_t backup_x = player.x;
-    uint8_t backup_y = player.y;
+    struct Coordinate moves[MAX_NEIGHBORS] = {0};
+    enum Player backup1 = board.board[x1][y1].player_id;
+    enum Player backup2 = board.board[player.x][player.y].player_id;
 
     board.board[player.x][player.y].player_id = NONE;
-    board.board[x1][y1].player_id = player.player_id;
+    board.board[x1][y1].player_id = player.id;
 
-    calculate_possible_moves(player.player_id == RED ? WHITE : RED);
+    calculate_possible_moves(moves, player.id == RED ? WHITE : RED);
 
-    uint8_t best_y = current_possible_moves[0].y;
-    for(uint8_t i = 1; i < MAX_NEIGHBORS && current_possible_moves->as_uint32_t != UINT32_MAX; i++)
+    uint8_t best_y = moves[0].y;
+    for (uint8_t i = 1; i < MAX_NEIGHBORS && moves->x != UINT8_MAX; i++)
     {
-        if(player.player_id == RED && current_possible_moves[i].y < best_y)
+        if ((player.id == RED && moves[i].y < best_y) ||
+            (player.id == WHITE && moves[i].y > best_y))
         {
-            best_y = current_possible_moves[i].y;
-        }
-        else if(player.player_id == WHITE && current_possible_moves[i].y > best_y)
-        {
-            best_y = current_possible_moves[i].y;
+            best_y = moves[i].y;
         }
     }
 
-    board.board[player.x][player.y].player_id = player.player_id;
-    board.board[x1][y1].player_id = NONE;
-    calculate_possible_moves(player.player_id); // reset
+    board.board[player.x][player.y].player_id = backup2;
+    board.board[x1][y1].player_id = backup1;
 
     // penalizes cases where a move enables the opponent to jump over,
     // TODO: penalize also diagonal moves that make its path shorter
-    return 1 + (abs(best_y - y2) > 1 ? 1 : 0); 
+    return 1 + (abs(best_y - y2) > 1 ? 1 : 0);
 }
 
 struct Coordinate
 calculate_best_move(const struct PlayerInfo *player, uint8_t *path_length)
 {
-    struct PlayerInfo opponent = player->player_id == RED ? white : red;
+    struct Coordinate moves[MAX_NEIGHBORS] = {0};
+    struct PlayerInfo opponent = player->id == RED ? white : red;
     struct Coordinate best_move;
 
-    calculate_possible_moves(player->player_id); // TODO: can be optimized
+    calculate_possible_moves(moves, player->id);
 
     struct
     {
@@ -72,13 +66,13 @@ calculate_best_move(const struct PlayerInfo *player, uint8_t *path_length)
     } neighbors = {.size = 0};
     for (uint8_t i = 0; i < MAX_NEIGHBORS; i++)
     {
-        if (current_possible_moves[i].as_uint32_t != -1)
-        {
-            neighbors.data[neighbors.size][0] = current_possible_moves[i].x;
-            neighbors.data[neighbors.size][1] = current_possible_moves[i].y;
-            neighbors.weights[neighbors.size] = get_weight(*player,current_possible_moves[i].x, current_possible_moves[i].y, opponent.x, opponent.y);
-            neighbors.size++;
-        }
+        if (moves[i].x == UINT8_MAX) break;
+
+        neighbors.data[neighbors.size][0] = moves[i].x;
+        neighbors.data[neighbors.size][1] = moves[i].y;
+        neighbors.weights[neighbors.size] =
+            get_weight(*player, moves[i].x, moves[i].y, opponent.x, opponent.y);
+        neighbors.size++;
     }
 
     union {
@@ -91,7 +85,7 @@ calculate_best_move(const struct PlayerInfo *player, uint8_t *path_length)
     } next_move;
     next_move.as_uint16_t = astar(player->x,
                                   player->y,
-                                  player->player_id == RED ? BOARD_SIZE - 1 : 0,
+                                  player->id == RED ? BOARD_SIZE - 1 : 0,
                                   neighbors.data,
                                   neighbors.weights,
                                   neighbors.size,
@@ -99,8 +93,6 @@ calculate_best_move(const struct PlayerInfo *player, uint8_t *path_length)
 
     best_move =
         (struct Coordinate){next_move.coordinate.x, next_move.coordinate.y};
-
-    calculate_possible_moves(me->player_id); // reset current moves
 
     return best_move;
 }
@@ -161,14 +153,14 @@ struct _Tuple choose_defensive_wall(const uint8_t path)
         {1, 1}
     };
     uint8_t last_path_length;
-    struct PlayerInfo opponent = me->player_id == RED ? white : red;
+    struct PlayerInfo opponent = me->id == RED ? white : red;
 
     struct Cell board_backup[BOARD_SIZE][BOARD_SIZE];
     memcpy(board_backup, board.board, sizeof(board.board));
     struct _Tuple good_walls[(BOARD_SIZE - 1) * (BOARD_SIZE - 1) * 2] = {0};
     uint16_t good_walls_size = 0;
 
-    struct _Tuple tu = choose_wall(opponent.player_id);
+    struct _Tuple tu = choose_wall(opponent.id);
     last_path_length = tu.path;
 
     // CHOOSE A WALL THAT MAKES THE MAIN CHARACTER's PATH LONGER
@@ -187,7 +179,7 @@ struct _Tuple choose_defensive_wall(const uint8_t path)
 
             if (is_wall_valid(co.x, co.y, dir))
             {
-                tu = choose_wall(opponent.player_id);
+                tu = choose_wall(opponent.id);
 
                 if (last_path_length >= tu.path)
                 {
@@ -221,8 +213,7 @@ struct _Tuple choose_defensive_wall(const uint8_t path)
 
         place_tmp_wall(good_walls[i].dir, co.x, co.y);
 
-        calculate_best_move(opponent.player_id == RED ? &white : &red,
-                            &path_length);
+        calculate_best_move(opponent.id == RED ? &white : &red, &path_length);
 
         // can even shorten the path when placing a wall enables a diagonal
         // movement, take it with the equal because the last walls in the list
@@ -246,15 +237,14 @@ struct _Tuple choose_defensive_wall(const uint8_t path)
 struct Coordinate choose_random_valid_move()
 {
     uint8_t valid_moves = 0;
-    for (uint8_t i = 0; i < 5; i++)
+    while (valid_moves < MAX_NEIGHBORS &&
+           legal_moves[valid_moves].x != UINT8_MAX)
     {
-        if (current_possible_moves[i].as_uint32_t != (uint32_t)-1)
-            valid_moves++;
+        valid_moves++;
     }
 
     uint8_t index = RAND(0, valid_moves);
-    return (struct Coordinate){current_possible_moves[index].x,
-                               current_possible_moves[index].y};
+    return (struct Coordinate){legal_moves[index].x, legal_moves[index].y};
 }
 
 struct _Tuple choose_wall(enum Player player)
@@ -322,8 +312,7 @@ struct _Tuple choose_wall(enum Player player)
     // worst cane scenario: no wall exists that does not sabotage me, take the
     // last good one that still slows the main character down
     struct _Tuple best_wall = good_walls[good_walls_size - 1];
-    calculate_best_move(opponent.player_id == RED ? &white : &red,
-                        &path_length);
+    calculate_best_move(opponent.id == RED ? &white : &red, &path_length);
     last_path_length = path_length;
 
     // FILTER OUT WALL MOVES THAT MAKE MY PATH LONGER
@@ -333,8 +322,7 @@ struct _Tuple choose_wall(enum Player player)
 
         place_tmp_wall(good_walls[i].dir, co.x, co.y);
 
-        calculate_best_move(opponent.player_id == RED ? &white : &red,
-                            &path_length);
+        calculate_best_move(opponent.id == RED ? &white : &red, &path_length);
 
         // can even shorten the path when placing a wall enables a diagonal
         // movement, take it with the equal because the last walls in the list
@@ -357,24 +345,23 @@ struct _Tuple choose_wall(enum Player player)
 
 bool can_make_winning_move(enum Player player)
 {
-    bool flag = false;
     uint8_t winning_y = player == RED ? BOARD_SIZE - 1 : 0;
-    calculate_possible_moves(player);
-    for (uint8_t i = 0; i < 5; i++)
+    struct Coordinate moves[MAX_NEIGHBORS] = {0};
+    calculate_possible_moves(moves, player);
+
+    for (uint8_t i = 0; i < MAX_NEIGHBORS; i++)
     {
-        if (current_possible_moves[i].y == winning_y) flag = true;
+        if (moves[i].y == winning_y) return true;
     }
-    calculate_possible_moves(me->player_id); // TODO make possible moves return
-                                             // instead of always acting on
-                                             // global variables
-    return flag;
+
+    return false;
 }
 
 bool try_make_winning_move(bool *has_walls)
 {
-    if (can_make_winning_move(me->player_id))
+    if (can_make_winning_move(me->id))
     {
-        move_player(me->x, me->player_id == RED ? BOARD_SIZE - 1 : 0);
+        move_player(me->x, me->id == RED ? BOARD_SIZE - 1 : 0);
         return true;
     }
     return false;
@@ -382,16 +369,16 @@ bool try_make_winning_move(bool *has_walls)
 
 bool try_place_blocking_wall(bool *has_walls)
 {
-    if (*has_walls && can_make_winning_move(me->player_id == RED ? WHITE : RED))
+    if (*has_walls && can_make_winning_move(me->id == RED ? WHITE : RED))
     {
         clear_highlighted_moves();
 
-        struct _Tuple tu = choose_wall(me->player_id);
+        struct _Tuple tu = choose_wall(me->id);
 
         if (tu.path != 0)
         {
             direction = tu.dir;
-            place_wall(tu.co.x, tu.co.y);
+            place_wall(tu.co.x, tu.co.y, tu.dir);
             return true;
         }
     }
@@ -406,7 +393,7 @@ bool try_place_random_wall(bool *has_walls)
 
         struct _Tuple tu = choose_random_valid_wall();
         direction = tu.dir;
-        place_wall(tu.co.x, tu.co.y);
+        place_wall(tu.co.x, tu.co.y, tu.dir);
         return true;
     }
     return false;
@@ -425,12 +412,12 @@ bool try_place_offensive_wall(bool *has_walls)
     {
         clear_highlighted_moves();
 
-        struct _Tuple tu = choose_wall(me->player_id);
+        struct _Tuple tu = choose_wall(me->id);
 
         if (tu.path != 0)
         {
             direction = tu.dir;
-            place_wall(tu.co.x, tu.co.y);
+            place_wall(tu.co.x, tu.co.y, tu.dir);
             return true;
         }
     }
@@ -443,7 +430,7 @@ bool try_place_defensive_wall(bool *has_walls)
     {
         clear_highlighted_moves();
 
-        struct _Tuple tu = choose_wall(me->player_id == RED ? WHITE : RED);
+        struct _Tuple tu = choose_wall(me->id == RED ? WHITE : RED);
 
         if (tu.path == 0) return false;
 
@@ -451,7 +438,7 @@ bool try_place_defensive_wall(bool *has_walls)
         if (tu.path == 0) return false;
 
         direction = tu.dir;
-        place_wall(tu.co.x, tu.co.y);
+        place_wall(tu.co.x, tu.co.y, tu.dir);
         return true;
     }
     return false;
@@ -463,8 +450,7 @@ bool try_make_move(bool *has_walls)
 
     for (uint8_t i = 0; i < 5; i++) // check if the move is valid
     {
-        if (current_possible_moves[i].x == co.x &&
-            current_possible_moves[i].x == co.x)
+        if (legal_moves[i].x == co.x && legal_moves[i].x == co.x)
         {
             move_player(co.x, co.y);
             return true;
@@ -496,7 +482,7 @@ void AI_move(void)
     static bool flag = true;
     if (flag) // executes only once
     {
-        me = opponent == RED ? &red : &white;
+        me = NPC == RED ? &red : &white;
         flag = false;
     }
     bool has_walls = me->wall_count > 0;
@@ -513,5 +499,5 @@ void AI_move(void)
     }
 
     // if everything else fails, select first of the possible moves
-    move_player(current_possible_moves[0].x, current_possible_moves[0].y);
+    move_player(legal_moves[0].x, legal_moves[0].y);
 }

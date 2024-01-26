@@ -11,6 +11,8 @@ void draw_single_board_menu(void);
 
 void draw_two_board_menu(void);
 
+void draw_waiting_for_connection(void);
+
 void draw_color_selection_menu(void);
 
 void refresh_walls(void);

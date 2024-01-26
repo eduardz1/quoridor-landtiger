@@ -1,5 +1,4 @@
 #include "headers/comparable.h"
-#include "../common.h"
 #include "../game/npc.h"
 #include <stdint.h>
 

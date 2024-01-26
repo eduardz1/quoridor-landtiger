@@ -51,7 +51,6 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "GLCD.h"
-#include "../common.h"
 #include "AsciiLib.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -131,7 +130,7 @@ static __attribute__((always_inline)) void LCD_Send(uint16_t byte)
 static void wait_delay(int count)
 {
 #ifndef DISABLE_DELAY
-    while (count--) __asm("nop");
+    while (count--) __asm("");
 #else
     return;
 #endif
@@ -327,7 +326,7 @@ void delay_ms(uint16_t ms)
     uint16_t i, j;
     for (i = 0; i < ms; i++)
     {
-        for (j = 0; j < 1141; j++) __asm("nop");
+        for (j = 0; j < 1141; j++) __asm("");
     }
 #else
     return;
@@ -451,16 +450,10 @@ void LCD_Clear(uint16_t Color)
         LCD_WriteReg(0x08, 0x01);
         LCD_WriteReg(0x09, 0x3F);
     }
-    else
-    {
-        LCD_SetCursor(0, 0);
-    }
+    else { LCD_SetCursor(0, 0); }
 
     LCD_WriteIndex(0x0022);
-    for (index = 0; index < MAX_X * MAX_Y; index++)
-    {
-        LCD_WriteData(Color);
-    }
+    for (index = 0; index < MAX_X * MAX_Y; index++) { LCD_WriteData(Color); }
 }
 
 /******************************************************************************
@@ -542,10 +535,7 @@ uint16_t LCD_GetPoint(uint16_t Xpos, uint16_t Ypos)
 __attribute__((always_inline)) void
 LCD_SetPoint(uint16_t const Xpos, uint16_t const Ypos, uint16_t const color)
 {
-    if (Xpos >= MAX_X || Ypos >= MAX_Y || color == TRANSPARENT)
-    {
-        return;
-    }
+    if (Xpos >= MAX_X || Ypos >= MAX_Y || color == TRANSPARENT) { return; }
     LCD_SetCursor(Xpos, Ypos);
     LCD_WriteReg(0x0022, color);
 }
@@ -613,10 +603,7 @@ void LCD_DrawLine(
                 y0++; /* Ϊ�������ڵ㣬����x0+1,y0+1�� */
                 temp += 2 * dy - 2 * dx;
             }
-            else
-            {
-                temp += 2 * dy; /* �ж����¸����λ�� */
-            }
+            else { temp += 2 * dy; /* �ж����¸����λ�� */ }
         }
         LCD_SetPoint(x0, y0, color);
     }
@@ -632,10 +619,7 @@ void LCD_DrawLine(
                 x0++;
                 temp += 2 * dy - 2 * dx;
             }
-            else
-            {
-                temp += 2 * dy;
-            }
+            else { temp += 2 * dy; }
         }
         LCD_SetPoint(x0, y0, color);
     }
@@ -677,10 +661,7 @@ void LCD_write_text(uint16_t x,
     do {
         tmp = *str++;
         put_char(x, y, tmp, color, background_color, scale);
-        if (x < MAX_X - FONT_WIDTH * scale)
-        {
-            x += FONT_WIDTH * scale;
-        }
+        if (x < MAX_X - FONT_WIDTH * scale) { x += FONT_WIDTH * scale; }
         else if (y < MAX_Y - FONT_HEIGHT * scale)
         {
             x = 0;
@@ -704,10 +685,7 @@ __attribute__((flatten)) void LCD_draw_image(const uint16_t startX,
 
     for (y = startY; y < endY; y++)
     {
-        for (x = startX; x < endX; x++)
-        {
-            LCD_SetPoint(x, y, *image++);
-        }
+        for (x = startX; x < endX; x++) { LCD_SetPoint(x, y, *image++); }
     }
 }
 
@@ -744,10 +722,7 @@ __attribute__((flatten)) void LCD_draw_rectangle(const uint16_t startX,
 
     for (y = startY; y < endY; y++)
     {
-        for (x = startX; x < endX; x++)
-        {
-            LCD_SetPoint(x, y, color);
-        }
+        for (x = startX; x < endX; x++) { LCD_SetPoint(x, y, color); }
     }
 }
 

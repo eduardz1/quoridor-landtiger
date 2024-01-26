@@ -70,12 +70,12 @@ reconstruct_path(struct Node *goal, uint8_t *path_length)
             uint8_t y;
         } coordinates;
         uint16_t as_uint16_t;
-    } next_move;
+    } next_move = {0};
 
     *path_length = 1;
 
     struct Node *tmp = goal;
-    while(tmp->parent != NULL)
+    while (tmp->parent != NULL)
     {
         next_move.coordinates.x = tmp->x;
         next_move.coordinates.y = tmp->y;
@@ -92,7 +92,7 @@ reconstruct_path(struct Node *goal, uint8_t *path_length)
     *path_length = 1;
 
     struct Node *tmp = goal;
-    while(tmp != NULL)
+    while (tmp != NULL)
     {
         path[i] = node_new_dynamic(tmp->x, tmp->y, tmp->g, tmp->h);
         tmp = tmp->parent;
@@ -191,8 +191,8 @@ astar(const uint8_t start_x,
         uint8_t x = starter_neighbors[i][0];
         uint8_t y = starter_neighbors[i][1];
 
-        struct Node *neighbor = node_new(
-            x, y, starter_neighbors_weights[i], abs(y - goal));
+        struct Node *neighbor =
+            node_new(x, y, starter_neighbors_weights[i], abs(y - goal));
         neighbor->parent = start_l;
         min_heap_insert(&open_set.heap, neighbor);
         open_set.hash[x][y] = true;
@@ -210,7 +210,7 @@ astar(const uint8_t start_x,
 
         for (uint8_t i = 0; i < neighbors.size; i++)
         {
-            uint8_t tent_g = curr->g + 1; // distance curr -> neighbor is constant
+            uint8_t tent_g = curr->g + 1; // dist curr -> neighbor is constant
 
             uint8_t x = neighbors.data[i][0];
             uint8_t y = neighbors.data[i][1];

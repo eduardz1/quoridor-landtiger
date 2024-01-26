@@ -14,8 +14,14 @@
     5 // there are no configurations where more that 5 possible moves are
       // possible
 
+extern bool AI_enabled;
+extern bool CAN_enabled;
+
+extern bool connected;
+
 extern enum Player opponent;
-extern union Move current_possible_moves[MAX_NEIGHBORS];
+extern enum Player NPC;
+extern struct Coordinate legal_moves[MAX_NEIGHBORS];
 extern struct Board board;
 extern enum Player current_player;
 extern enum Direction direction;
@@ -33,7 +39,8 @@ void game_init(void);
  */
 void change_turn(void);
 
-void calculate_possible_moves(const enum Player player);
+void calculate_possible_moves(struct Coordinate moves[MAX_NEIGHBORS],
+                              const enum Player player);
 
 /**
  * @brief moves the player sprite, updates the current player position on the
@@ -109,8 +116,10 @@ void rollback_walls(uint8_t x,
  *
  * @param x coordinate on board
  * @param y coordinate on board
+ * @param dir direction of the wall
  */
-union Move place_wall(const uint8_t x, const uint8_t y);
+union Move
+place_wall(const uint8_t x, const uint8_t y, const enum Direction dir);
 
 /**
  * @brief used to select one of the button from the menu
